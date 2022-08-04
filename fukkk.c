@@ -20,7 +20,14 @@
 
 void listFiles(const char *path);
 
-/*void raceconditiontemplate() {
+
+
+/*int raceconditiontemplate(void func, uint32_t selection) {
+    pthread_t t;
+    //pthread_create(&t, NULL, (void *(*)(void *)) race, (void*) (uint32_t)queueID);
+    pthread_create(&t, NULL, (void*(*)(void *))func, (void*)selection);
+    pthread_join(t, NULL);
+
     
 }*/
 
@@ -53,7 +60,9 @@ fake_IOConnectCallMethod(
   void       *outputStruct,
   size_t     *outputStructCntP)
 {
+    kern_return_t new;
     int watcher = 0;
+    int failortimeout = 0;
     int looplimit = 100000; //2147483647; lets set the limit to something less time consuming like 100000?
   /*if (maybe()){
     flip_bit(input, sizeof(*input) * inputCnt);
@@ -68,7 +77,53 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     if (watcher == looplimit) {
         break;
     }
-    printf("here : %d", watcher);
+    if(failortimeout == 5) {
+        break;
+    }
+    //printf("here : %d", watcher);
+    
+    new = IOConnectCallMethod(
+    connection,
+    selector,
+    input,
+    inputCnt,
+    inputStruct,
+    inputStructCnt,
+    output,
+    outputCnt,
+    outputStruct,
+    outputStructCntP);
+    if(new != KERN_SUCCESS) {
+        failortimeout++;
+    }
+    struct arg_struct
+    {
+        mach_port_t connection;
+        uint32_t    selector;
+        uint64_t   *input;
+        uint32_t    inputCnt;
+        void       *inputStruct;
+        size_t      inputStructCnt;
+        uint64_t   *output;
+        uint32_t   *outputCnt;
+        void       *outputStruct;
+        size_t     *outputStructCntP;
+    } args;
+    //raceconditiontemplate(<#int func#>, <#uint32_t selection#>)
+    pthread_t t;
+    //pthread_create(&t, NULL, (void *(*)(void *)) race, (void*) (uint32_t)queueID);
+    args.connection = connection;
+    args.selector = selector;
+    args.input = input;
+    args.inputCnt = inputCnt;
+    args.inputStruct = inputStruct;
+    args.inputStructCnt = inputStructCnt;
+    args.output = output;
+    args.outputCnt = outputCnt;
+    args.outputStruct = outputStruct;
+    args.outputStructCntP = outputStructCntP;
+    
+    pthread_create(&t, NULL, (void*(*)(void *))IOConnectCallMethod, (void*)&args);
     IOConnectCallMethod(
     connection,
     selector,
@@ -80,11 +135,13 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     outputCnt,
     outputStruct,
     outputStructCntP);
+    pthread_join(t, NULL);
     //lets call this first with original parameters ...
     flip_bit(input, sizeof(*input) * inputCnt);
     flip_bit(inputStruct, inputStructCnt);
     
 }
+    
     return IOConnectCallMethod(
     connection,
     selector,
@@ -102,7 +159,7 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
 void fuzzXD(io_name_t class, uint32_t num) {
     //lets declare some interesting int's shall we ;)
     printf("about to fuzz %s\n", class);
-    int interesting[16];
+    int interesting[7];
     interesting[0] = 0x41414141;
     interesting[1] = 0x13371337;
     interesting[2] = 0;
@@ -120,10 +177,10 @@ void fuzzXD(io_name_t class, uint32_t num) {
     //fuzzying like this will probably reach use after frees, type confusions, and BoFs, and oobs
     //but I don't think it hit race condition sceneraios so let's add that feature after a call to
     //the fake IOConnectCallMethod!
-    for (uint32_t sel = 0; sel < 40; sel++){
+    for (uint32_t sel = 0; sel < 30; sel++){
     for (int inter = 0; inter < 7; inter++){
     //When reversing IOKit drivers on iOS ive never seen a method selector past at most 18;
-    //I don't know how much more it is for macOS kexts so let's try a wild guess of 40 ;)
+    //I don't know how much more it is for macOS kexts so let's try a wild guess of 30 ;)
     //also flip bit is going to flip input  and inputStruct so might as well squeeze as much as possible
     //;)
     uint64_t inputScalar[1];
@@ -136,17 +193,17 @@ void fuzzXD(io_name_t class, uint32_t num) {
     size_t inputStructCnt = 0;
 
     uint64_t outputScalar[16];
-    outputScalar[1] = interesting[inter];
+    //outputScalar[1] = interesting[inter];
     uint32_t outputScalarCnt = 1;
 
     char outputStruct[16];
-    outputStruct[0] = (char)interesting[inter];
+    //outputStruct[0] = (char)interesting[inter];
     size_t outputStructCnt = 1;
     kern_return_t err = fake_IOConnectCallMethod(connect, sel, inputScalar, inputScalarCnt, inputStruct, inputStructCnt, outputScalar, &outputScalarCnt, outputStruct, &outputStructCnt);
         if(err != KERN_SUCCESS) {
             printf("fuzzying class %s failed :(",class);
         }
-        printf("done fuzzying and flipping %s connectcallmethod bits",class);
+        printf("done fuzzying and flipping %s connectcallmethod bits\n",class);
     }
     }
     
