@@ -6,12 +6,12 @@ fukkkkernfuzzer is a Hybrid fuzzer between a smart fuzzer schematics and a major
 
 The smart side of the fuzzer is the "logic" ~*which isn't 100% correct"*~.
 
-The logic behind this fuzzer is it'll save corpus files "aka sample codes it the fuzzer sends to the kernel.
+~The logic behind this fuzzer is it'll save corpus files "aka sample codes it the fuzzer sends to the kernel.~
 
-*That is yet to come* ~easy to implement
+*That is yet to come* ~easy to implement~
 
 *Check code coverage normally you can do this by having a debug kernel or kernel that have san coverage* but that would recquire building
-your own kernel which that isn't the aim of this project it's supposed to be noob friendlt :)*
+your own kernel which that isn't the aim of this project it's supposed to be noob friendly :)*
 
 *Maybe their is someway to hook console.app and filter for kernel messages to see what we are actually feeding to "kexts"?*
 
