@@ -1,5 +1,5 @@
 # fukkkkern
-fukkkkernfuzzer is a Hybrid fuzzer between a smart fuzzer schematics and a majority dumb fuzzer.
+fukkkkernfuzzer is a Hybrid fuzzer between a smart fuzzer schematics and a majority dumb fuzzer for IOKIT fuzzying.
 The smart side of the fuzzer is the "logic" ~*which isn't 100% correct"*~.
 The logic behind this fuzzer is it'll save corpus files "aka sample codes it the fuzzer sends to the kernel.
 *That is yet to come* ~easy to implement
