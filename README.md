@@ -1,5 +1,7 @@
 # fukkkkern
 
+All credit's goes to P0 and it's members for their ideas and code pieces that I borrowed!
+
 fukkkkernfuzzer is a Hybrid fuzzer between a smart fuzzer schematics and a majority dumb fuzzer for IOKIT fuzzying.
 
 The smart side of the fuzzer is the "logic" ~*which isn't 100% correct"*~.
