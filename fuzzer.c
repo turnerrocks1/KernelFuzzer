@@ -132,8 +132,8 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     pthread_create(&t, NULL, (void*(*)(void *))IOConnectCallMethod, (void*)&args);
     pthread_join(t, NULL);
     //lets call this first with original parameters ...
-    flip_bit(input, sizeof(*input) * inputCnt);
-    flip_bit(inputStruct, inputStructCnt);
+    flip_bit(input, sizeof(input));
+    flip_bit(inputStruct, sizeof(inputStruct));
     
 }
     
