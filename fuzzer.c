@@ -235,105 +235,117 @@ void fuzzXD(io_name_t class, uint32_t num, FILE *f) {
     free(chFullPath);*/
 }
 int pickkexts(void) {
-        kern_return_t kr;
-        io_iterator_t iterator = IO_OBJECT_NULL;
+    kern_return_t kr;
+    io_iterator_t iterator = IO_OBJECT_NULL;
     kr = IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching("IOService"), &iterator);
-        uint32_t type;
-        for (;;) {
-            io_service_t service = IOIteratorNext(iterator);
-            if (service == IO_OBJECT_NULL) {
-                break;
-            }
-            io_name_t class_name = {};
-            IOObjectGetClass(service, class_name);
-            uint64_t entry_id = 0;
-            IORegistryEntryGetRegistryEntryID(service, &entry_id);
-            //printf("%s 0x%llx  ", class_name, entry_id);
-            
-            io_connect_t connect = MACH_PORT_NULL;
-            for (type = 0; type < 0x200; type++) {
-                kr = IOServiceOpen(service, mach_task_self(), type, &connect);
-                if (kr == KERN_SUCCESS) {
-                    goto can_open;
-                }
-            }
-            for (type = 0xffffff00; type != 0; type++) {
-                kr = IOServiceOpen(service, mach_task_self(), type, &connect);
-                if (kr == KERN_SUCCESS) {
-                    goto can_open;
-                }
-            }
-            uint32_t types[] = { 0x61736864, 0x484944, 0x99000002, 0xFF000001, 0x64506950, 0x6C506950, 0x88994242, 0x48494446, 0x48494444, 0x57694669 };
-            uint32_t count = sizeof(types); // sizeof(types[0]);
-            for (uint32_t type_idx = 0; type_idx < count; type_idx++) {
-                type = types[type_idx];
-                kr = IOServiceOpen(service, mach_task_self(), type, &connect);
-                if (kr == KERN_SUCCESS) {
-                    goto can_open;
-                }
-            }
-            //printf("\n");
-            goto next;
-            //break;
-        can_open:
-            //return 2;
-            if(strcmp(class_name,"IOPMrootDomain") == 0) {
-                printf("skipping %s\n",class_name);
-                goto next;
-            }
-            /* crashing or getting persistent kernel panics and log with no context is no fun :(
-             we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
-                char* dir = "fuzzer";
-                char* filer = "fuzzed.txt";
-                //variable declaration
-                int fd = 0;
-                char *chDirName = NULL;
-                char *chFileName = NULL;
-                char *chFullPath = NULL;
-                struct stat sfileInfo;
-
-                //argument processing
-                chDirName = (char *)malloc(sizeof(char));
-                chFileName = (char *)malloc(sizeof(char));
-                chFullPath = (char *)malloc(sizeof(char));
-                chDirName = strcpy(chDirName,dir);
-                chFileName = strcpy(chFileName,filer);
-
-                //create full path of file
-                sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
-
-                //check directory exists or not
-                if(stat(chDirName,&sfileInfo) == -1)
-                {
-                    mkdir(chDirName,0700);
-                    printf("[INFO] Directory Created: %s\n",chDirName);
-                }
-
-                //create file inside given directory
-                fd = creat(chFullPath,0644);
-                //FILE *f;
-                //f = fopen(fd, "+a");
-            
-                if(fd == -1)
-                {
-                    printf("[ERROR] Unable to create file: %s\n",chFullPath);
-                    free(chDirName);
-                    free(chFileName);
-                    free(chFullPath);
-                    return -10;
-                }
-
-                printf("[INFO] File Created Successfully : %s\n",chFullPath);
-                FILE *f = fopen(chFullPath, "w");
-                /*close resources
-                close(fd);
-                free(chDirName);
-                free(chFileName);
-                free(chFullPath);*/
-            fuzzXD(class_name,type,f);
-            goto next;
-        next:;
+    uint32_t type;
+    for (;;) {
+        io_service_t service = IOIteratorNext(iterator);
+        if (service == IO_OBJECT_NULL) {
+            break;
         }
+        io_name_t class_name = {};
+        IOObjectGetClass(service, class_name);
+        uint64_t entry_id = 0;
+        IORegistryEntryGetRegistryEntryID(service, &entry_id);
+        //printf("%s 0x%llx  ", class_name, entry_id);
+        
+        /* crashing or getting persistent kernel panics and log with no context is no fun :(
+         we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
+        char* dir = "fuzzer";
+        char* filer = "fuzzed";
+        //variable declaration
+        int fd = 0;
+        char *chDirName = NULL;
+        char *chFileName = NULL;
+        char *chFullPath = NULL;
+        struct stat sfileInfo;
+        
+        //argument processing
+        chDirName = (char *)malloc(sizeof(char));
+        chFileName = (char *)malloc(sizeof(char));
+        chFullPath = (char *)malloc(sizeof(char));
+        chDirName = strcpy(chDirName,dir);
+        chFileName = strcpy(chFileName,filer);
+        
+        //create full path of file
+        sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
+        
+        //check directory exists or not
+        if(stat(chDirName,&sfileInfo) == -1)
+        {
+            mkdir(chDirName,0700);
+            printf("[INFO] Directory Created: %s\n",chDirName);
+        }
+        
+        //create file inside given directory
+        fd = creat(chFullPath,0644);
+        //FILE *f;
+        //f = fopen(fd, "+a");
+        
+        if(fd == -1)
+        {
+            printf("[ERROR] Unable to create file: %s\n",chFullPath);
+            free(chDirName);
+            free(chFileName);
+            free(chFullPath);
+            return -10;
+        }
+        
+        printf("[INFO] File Created Successfully : %s\n",chFullPath);
+        FILE *f = fopen(chFullPath, "w");
+        //printf("\n");
+        
+        io_connect_t connect = MACH_PORT_NULL;
+        for (type = 0; type < 0x200; type++) {
+            kr = IOServiceOpen(service, mach_task_self(), type, &connect);
+            if (kr == KERN_SUCCESS) {
+                goto can_open;
+            }
+        }
+        for (type = 0xffffff00; type != 0; type++) {
+            kr = IOServiceOpen(service, mach_task_self(), type, &connect);
+            if (kr == KERN_SUCCESS) {
+                goto can_open;
+            }
+        }
+        uint32_t types[] = { 0x61736864, 0x484944, 0x99000002, 0xFF000001, 0x64506950, 0x6C506950, 0x88994242, 0x48494446, 0x48494444, 0x57694669 };
+        uint32_t count = sizeof(types); // sizeof(types[0]);
+        for (uint32_t type_idx = 0; type_idx < count; type_idx++) {
+            type = types[type_idx];
+            kr = IOServiceOpen(service, mach_task_self(), type, &connect);
+            if (kr == KERN_SUCCESS) {
+                goto can_open;
+            }
+        }
+        
+        goto next;
+        //break;
+    can_open: {
+        //return 2;
+        if(strcmp(class_name,"IOPMrootDomain") == 0) {
+            printf("skipping %s\n",class_name);
+            goto next;
+        }
+        /*close resources
+         close(fd);
+         free(chDirName);
+         free(chFileName);
+         free(chFullPath);*/
+        fuzzXD(class_name,type,f);
+        goto next;
+    }
+    next:{
+        
+    };
+        
+        //close resources
+        close(fd);
+        free(chDirName);
+        free(chFileName);
+        free(chFullPath);
+        //return 0;
+    }
     return 0;
 }
 
