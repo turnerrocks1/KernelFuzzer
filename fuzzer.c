@@ -165,58 +165,10 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     
 }
 
-void fuzzXD(io_name_t class, uint32_t num) {
+void fuzzXD(io_name_t class, uint32_t num, FILE *f) {
     //lets declare some interesting int's shall we ;)
     printf("about to fuzz %s\n", class);
-    /* crashing or getting persistent kernel panics and log with no context is no fun :(
-     we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
-        char* dir = "fuzzer";
-        char* filer = "fuzzed.txt";
-        //variable declaration
-        int fd = 0;
-        char *chDirName = NULL;
-        char *chFileName = NULL;
-        char *chFullPath = NULL;
-        struct stat sfileInfo;
-
-        //argument processing
-        chDirName = (char *)malloc(sizeof(char));
-        chFileName = (char *)malloc(sizeof(char));
-        chFullPath = (char *)malloc(sizeof(char));
-        chDirName = strcpy(chDirName,dir);
-        chFileName = strcpy(chFileName,filer);
-
-        //create full path of file
-        sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
-
-        //check directory exists or not
-        if(stat(chDirName,&sfileInfo) == -1)
-        {
-            mkdir(chDirName,0700);
-            printf("[INFO] Directory Created: %s\n",chDirName);
-        }
-
-        //create file inside given directory
-        fd = creat(chFullPath,0644);
-        //FILE *f;
-        //f = fopen(fd, "+a");
     
-        if(fd == -1)
-        {
-            printf("[ERROR] Unable to create file: %s\n",chFullPath);
-            free(chDirName);
-            free(chFileName);
-            free(chFullPath);
-            return;
-        }
-
-        printf("[INFO] File Created Successfully : %s\n",chFullPath);
-        FILE *f = fopen(chFullPath, "w");
-        /*close resources
-        close(fd);
-        free(chDirName);
-        free(chFileName);
-        free(chFullPath);*/
         
     unsigned long long interesting[10];
     interesting[1] = INT_MIN;
@@ -277,10 +229,10 @@ void fuzzXD(io_name_t class, uint32_t num) {
     }
     printf("done fuzzying and flipping %s connectcallmethod bits\n",class);
     //close resources
-    close(fd);
+    /*close(fd);
     free(chDirName);
     free(chFileName);
-    free(chFullPath);
+    free(chFullPath);*/
 }
 int pickkexts(void) {
         kern_return_t kr;
@@ -329,7 +281,57 @@ int pickkexts(void) {
                 printf("skipping %s\n",class_name);
                 goto next;
             }
-            fuzzXD(class_name,type);
+            /* crashing or getting persistent kernel panics and log with no context is no fun :(
+             we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
+                char* dir = "fuzzer";
+                char* filer = "fuzzed.txt";
+                //variable declaration
+                int fd = 0;
+                char *chDirName = NULL;
+                char *chFileName = NULL;
+                char *chFullPath = NULL;
+                struct stat sfileInfo;
+
+                //argument processing
+                chDirName = (char *)malloc(sizeof(char));
+                chFileName = (char *)malloc(sizeof(char));
+                chFullPath = (char *)malloc(sizeof(char));
+                chDirName = strcpy(chDirName,dir);
+                chFileName = strcpy(chFileName,filer);
+
+                //create full path of file
+                sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
+
+                //check directory exists or not
+                if(stat(chDirName,&sfileInfo) == -1)
+                {
+                    mkdir(chDirName,0700);
+                    printf("[INFO] Directory Created: %s\n",chDirName);
+                }
+
+                //create file inside given directory
+                fd = creat(chFullPath,0644);
+                //FILE *f;
+                //f = fopen(fd, "+a");
+            
+                if(fd == -1)
+                {
+                    printf("[ERROR] Unable to create file: %s\n",chFullPath);
+                    free(chDirName);
+                    free(chFileName);
+                    free(chFullPath);
+                    return -10;
+                }
+
+                printf("[INFO] File Created Successfully : %s\n",chFullPath);
+                FILE *f = fopen(chFullPath, "w");
+                /*close resources
+                close(fd);
+                free(chDirName);
+                free(chFileName);
+                free(chFullPath);*/
+            fuzzXD(class_name,type,f);
+            goto next;
         next:;
         }
     return 0;
