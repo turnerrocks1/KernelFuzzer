@@ -252,8 +252,8 @@ int pickkexts(void) {
         
         /* crashing or getting persistent kernel panics and log with no context is no fun :(
          we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
-        char* dir = "fuzzer";
-        char* filer = "fuzzed";
+        char* dir = "";
+        //char* filer = "fuzzed";
         //variable declaration
         int fd = 0;
         char *chDirName = NULL;
@@ -266,10 +266,10 @@ int pickkexts(void) {
         chFileName = (char *)malloc(sizeof(char));
         chFullPath = (char *)malloc(sizeof(char));
         chDirName = strcpy(chDirName,dir);
-        chFileName = strcpy(chFileName,filer);
+        chFileName = strcpy(chFileName,class_name);
         
         //create full path of file
-        sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
+        sprintf(chFullPath,"%s%s.txt",chDirName,chFileName);
         
         //check directory exists or not
         if(stat(chDirName,&sfileInfo) == -1)
