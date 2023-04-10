@@ -171,6 +171,7 @@ void fuzzXD(io_name_t class, uint32_t num) {
     /* crashing or getting persistent kernel panics and log with no context is no fun :(
      we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
         char* dir = "fuzzer";
+        char* filer = "fuzzed.txt";
         //variable declaration
         int fd = 0;
         char *chDirName = NULL;
@@ -183,7 +184,7 @@ void fuzzXD(io_name_t class, uint32_t num) {
         chFileName = (char *)malloc(sizeof(char));
         chFullPath = (char *)malloc(sizeof(char));
         chDirName = strcpy(chDirName,dir);
-        chFileName = strcpy(chFileName,class);
+        chFileName = strcpy(chFileName,filer);
 
         //create full path of file
         sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
@@ -237,10 +238,13 @@ void fuzzXD(io_name_t class, uint32_t num) {
     //fuzzying like this will probably reach use after frees, type confusions, and BoFs, and oobs
     //but I don't think it hit race condition sceneraios so let's add that feature after a call to
     //the fake IOConnectCallMethod!
-    for (uint32_t sel = 0; sel < 30; sel++){
-    for (int inter = 0; inter < 10; inter++){
     fprintf(f,"kext class name #%s\n",class);
+    for (uint32_t sel = 0; sel < 30; sel++){
     fprintf(f,"selector method #%d\n",sel);
+    for (int inter = 0; inter < 10; inter++){
+    //fprintf(f,"kext class name #%s\n",class);
+    //fprintf(f,"kext class name #%s\n",class);
+    //fprintf(f,"selector method #%d\n",sel);
     fprintf(f,"interesting inter used #%llu\n",interesting[inter]);
     
     //When reversing IOKit drivers on iOS ive never seen a method selector past at most 18;
