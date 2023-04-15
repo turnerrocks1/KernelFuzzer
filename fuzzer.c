@@ -144,8 +144,8 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     //lets call this first with original parameters ...
     fprintf(f,"input bits before flipping #%lld\n",(long long)input);
     fprintf(f,"inputStruct bits before flipping #%llx\n",(uint64_t)inputStruct);
-    flip_bit(input, sizeof(input));
-    flip_bit(inputStruct, sizeof(inputStruct));
+    flip_bit(input, sizeof(*input) * inputCnt);
+    flip_bit(inputStruct, inputStructCnt);
     fprintf(f,"input bits flipped to #%lld\n",(long long)input);
     fprintf(f,"inputStruct bits flipped to #%llx\n",(uint64_t)inputStruct);
     
