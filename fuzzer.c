@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <sys/stat.h>
 #include <IOKit/IOKitLib.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -35,6 +36,23 @@ void flip_bit(void* buf, size_t len){
   size_t offset = rand() % len;
   ((uint8_t*)buf)[offset] ^= (0x01 << (rand() % 8));
 }
+struct arg_struct
+{
+    mach_port_t connection;
+    uint32_t    selector;
+    uint64_t   *input;
+    uint32_t    inputCnt;
+    void       *inputStruct;
+    size_t      inputStructCnt;
+    uint64_t   *output;
+    uint32_t   *outputCnt;
+    void       *outputStruct;
+    size_t     *outputStructCntP;
+} args;
+
+void racetemp(struct arg_struct args) {
+    IOConnectCallMethod(args.connection, args.selector, args.input, args.inputCnt, args.inputStruct, args.inputStructCnt, args.output, args.outputCnt, args.outputStruct, args.outputStructCntP);
+}
 
 kern_return_t
 fake_IOConnectCallMethod(
@@ -47,7 +65,8 @@ fake_IOConnectCallMethod(
   uint64_t   *output,
   uint32_t   *outputCnt,
   void       *outputStruct,
-  size_t     *outputStructCntP)
+  size_t     *outputStructCntP,
+  FILE        *f)
 {
     kern_return_t new;
     int watcher = 0x0;
@@ -85,19 +104,6 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     if(new != KERN_SUCCESS) {
         failortimeout++;
     }
-    struct arg_struct
-    {
-        mach_port_t connection;
-        uint32_t    selector;
-        uint64_t   *input;
-        uint32_t    inputCnt;
-        void       *inputStruct;
-        size_t      inputStructCnt;
-        uint64_t   *output;
-        uint32_t   *outputCnt;
-        void       *outputStruct;
-        size_t     *outputStructCntP;
-    } args;
     //raceconditiontemplate(<#int func#>, <#uint32_t selection#>)
     pthread_t t;
     //pthread_create(&t, NULL, (void *(*)(void *)) race, (void*) (uint32_t)queueID);
@@ -112,11 +118,11 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
     args.outputStruct = outputStruct;
     args.outputStructCntP = outputStructCntP;
     pid_t child_pid = fork();
-    if (child_pid == -1) {
+    if (child_pid < -1) {
         printf("fork failed\n");
-        return 0;
     }
-    if (child_pid) {
+    if (child_pid >= 0) {
+        printf("racing conditionattempt\n");
         IOConnectCallMethod(
         connection,
         selector,
@@ -129,11 +135,19 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
         outputStruct,
         outputStructCntP);
     }
-    pthread_create(&t, NULL, (void*(*)(void *))IOConnectCallMethod, (void*)&args);
-    pthread_join(t, NULL);
+    pthread_create(&t, NULL, (void*(*)(void *))racetemp, (void*)&args);
+    int errors = pthread_join(t, NULL);
+    //printf("error %d\n",errors);
+    if (errors != 0) {
+        break;
+    }
     //lets call this first with original parameters ...
-    flip_bit(input, sizeof(*input) * inputCnt);
-    flip_bit(inputStruct, inputStructCnt);
+    fprintf(f,"input bits before flipping #%lld\n",(long long)input);
+    fprintf(f,"inputStruct bits before flipping #%llx\n",(uint64_t)inputStruct);
+    flip_bit(input, sizeof(input));
+    flip_bit(inputStruct, sizeof(inputStruct));
+    fprintf(f,"input bits flipped to #%lld\n",(long long)input);
+    fprintf(f,"inputStruct bits flipped to #%llx\n",(uint64_t)inputStruct);
     
 }
     
@@ -154,6 +168,55 @@ for (;;) { //run the fuzzer in an endless loop cycle :)
 void fuzzXD(io_name_t class, uint32_t num) {
     //lets declare some interesting int's shall we ;)
     printf("about to fuzz %s\n", class);
+    /* crashing or getting persistent kernel panics and log with no context is no fun :(
+     we need a way of knowing this so my idea is to create a folder called fuzzXD and for each kext "class name" create a file with r/w perms and for each IOConnectCall we note down the args passed to it that way if there is a crash before the fuzzer can finish you can replicate the call :)*/
+        char* dir = "fuzzer";
+        //variable declaration
+        int fd = 0;
+        char *chDirName = NULL;
+        char *chFileName = NULL;
+        char *chFullPath = NULL;
+        struct stat sfileInfo;
+
+        //argument processing
+        chDirName = (char *)malloc(sizeof(char));
+        chFileName = (char *)malloc(sizeof(char));
+        chFullPath = (char *)malloc(sizeof(char));
+        chDirName = strcpy(chDirName,dir);
+        chFileName = strcpy(chFileName,class);
+
+        //create full path of file
+        sprintf(chFullPath,"%s/%s.txt",chDirName,chFileName);
+
+        //check directory exists or not
+        if(stat(chDirName,&sfileInfo) == -1)
+        {
+            mkdir(chDirName,0700);
+            printf("[INFO] Directory Created: %s\n",chDirName);
+        }
+
+        //create file inside given directory
+        fd = creat(chFullPath,0644);
+        //FILE *f;
+        //f = fopen(fd, "+a");
+    
+        if(fd == -1)
+        {
+            printf("[ERROR] Unable to create file: %s\n",chFullPath);
+            free(chDirName);
+            free(chFileName);
+            free(chFullPath);
+            return;
+        }
+
+        printf("[INFO] File Created Successfully : %s\n",chFullPath);
+        FILE *f = fopen(chFullPath, "w");
+        /*close resources
+        close(fd);
+        free(chDirName);
+        free(chFileName);
+        free(chFullPath);*/
+        
     unsigned long long interesting[10];
     interesting[1] = INT_MIN;
     interesting[2] = INT_MAX;
@@ -176,6 +239,10 @@ void fuzzXD(io_name_t class, uint32_t num) {
     //the fake IOConnectCallMethod!
     for (uint32_t sel = 0; sel < 30; sel++){
     for (int inter = 0; inter < 10; inter++){
+    fprintf(f,"kext class name #%s\n",class);
+    fprintf(f,"selector method #%d\n",sel);
+    fprintf(f,"interesting inter used #%llu\n",interesting[inter]);
+    
     //When reversing IOKit drivers on iOS ive never seen a method selector past at most 18;
     //I don't know how much more it is for macOS kexts so let's try a wild guess of 30 ;)
     //also flip bit is going to flip input  and inputStruct so might as well squeeze as much as possible
@@ -198,14 +265,18 @@ void fuzzXD(io_name_t class, uint32_t num) {
     size_t outputStructCnt = interesting[inter];
     memset(inputStruct,0,sizeof(inputStruct));
     memset(outputStruct,0,sizeof(outputStruct));
-    kern_return_t err = fake_IOConnectCallMethod(connect, sel, inputScalar, inputScalarCnt, inputStruct, inputStructCnt, outputScalar, &outputScalarCnt, outputStruct, &outputStructCnt);
+    kern_return_t err = fake_IOConnectCallMethod(connect, sel, inputScalar, inputScalarCnt, inputStruct, inputStructCnt, outputScalar, &outputScalarCnt, outputStruct, &outputStructCnt , f);
         if(err != KERN_SUCCESS) {
-            printf("fuzzying class %s failed :(\n",class);
+            //printf("fuzzying class %s failed :(\n",class);
         }
-        printf("done fuzzying and flipping %s connectcallmethod bits\n",class);
     }
     }
-    
+    printf("done fuzzying and flipping %s connectcallmethod bits\n",class);
+    //close resources
+    close(fd);
+    free(chDirName);
+    free(chFileName);
+    free(chFullPath);
 }
 int pickkexts(void) {
         kern_return_t kr;
@@ -250,53 +321,24 @@ int pickkexts(void) {
             //break;
         can_open:
             //return 2;
+            if(strcmp(class_name,"IOPMrootDomain") == 0) {
+                printf("skipping %s\n",class_name);
+                goto next;
+            }
             fuzzXD(class_name,type);
-            //printf("Can open %s with type %d\n",class_name,type);
         next:;
         }
     return 0;
 }
 
-/*char* listed[100000] = {''};
-void listFiles(const char *path)
-{
-    int increment = 0;
-    struct dirent *dp;
-    DIR *dir = opendir(path);
-
-    // Unable to open directory stream
-    if (!dir)
-        return;
-
-    while ((dp = readdir(dir)) != NULL)
-    {
-        ++increment;
-        //printf("%s\n", dp->d_name);
-        listed[increment] = (char)dp->d_name;
-        //return (void)listed;
-        //((char)dp->d_name + "\n");
-    }
-
-    // Close directory stream
-    closedir(dir);
-}
-
-void getextensionslist() {
-    char* extensionpath = "/System/Library/Extensions";
-    listFiles(extensionpath);
-    
-}*/
 //I was told not to go about listing every extension from /System/Library/Extensions and just use
 //Bazad's IOService iterator Method.
 
 int main(int argc, const char * argv[]) {
     printf("this is a multi-platform IOKit Fuzzer developed by turnerhackz1 on 0x8/0x3/0x2022 XD\n");
     
-    /*kern_return_t ret = fake_IOConnectCallMethod(<#mach_port_t connection#>, <#uint32_t selector#>, <#uint64_t *input#>, <#uint32_t inputCnt#>, <#void *inputStruct#>, <#size_t inputStructCnt#>, <#uint64_t *output#>, <#uint32_t *outputCnt#>, <#void *outputStruct#>, <#size_t *outputStructCntP#>)*/
-    //getextensionslist();
     int ret = pickkexts();
-    //printf("%s listed : ", (char*)listed);
     
     return ret;
 }
-//main();
+
